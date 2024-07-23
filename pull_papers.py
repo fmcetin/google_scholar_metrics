@@ -11,12 +11,22 @@ import time
 
 ECON_URL = "https://scholar.google.com/citations?view_op=top_venues&hl=en&vq=bus_economics"
 FINANCE_URL = "https://scholar.google.com/citations?view_op=top_venues&hl=en&vq=bus_finance"
+ACCT_URL = "https://scholar.google.com/citations?view_op=top_venues&hl=en&vq=bus_accountingtaxation"
+BUS_URL = "https://scholar.google.com/citations?view_op=top_venues&hl=en&vq=bus"
 
+my_top_journals = ["American Economic Review", "Journal of Political Economy", "The Quarterly Journal of Economics", 
+                   "The Review of Economic Studies", "Econometrica", 
+                   "Journal of Monetary Economics", "American Economic Association Papers and Proceedings"
+                   "The Journal of Finance", "The Review of Financial Studies",  "Journal of Financial Economics", "Review of Finance",
+                   "The Accounting Review", "Journal of Accounting and Economics", "Review of Accounting Studies", "Journal of Accounting Research",
+                   "Management Science"]
+
+headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
 # This function pulls the 20 journal names listed on a url, and the corresponding h5-index.
 # It also pulls the url link to the journal's page on Google Scholar listed in the h5-index.
 def pull_journals(url):
     # Pull the html from the url
-    page = requests.get(url)
+    page = requests.get(url, headers=headers)
     soup = BeautifulSoup(page.content, 'html.parser')
     # Pull the journal names and h5-indexes
     journals = soup.find_all('td', class_='gsc_mvt_t')
@@ -43,7 +53,7 @@ def pull_journals(url):
 # This function pulls the paper titles, authors, year and cites from a journal's page on Google Scholar.
 def pull_papers(url, journal_name):
     # Pull the html from the url
-    page = requests.get(url)
+    page = requests.get(url, headers=headers)
     soup = BeautifulSoup(page.content, 'html.parser')
     # Pull the paper titles
     titles = soup.find_all('a', class_='gsc_mp_anchor_lrge')
@@ -54,6 +64,9 @@ def pull_papers(url, journal_name):
     # Pull the paper cites
     cites = soup.find_all('a', class_='gs_ibl gsc_mp_anchor')
     cites = [cite for cite in cites if cite.text.isnumeric()]
+    # Pull the journal links
+    links = [bin for bin in soup.find_all('td', class_='gsc_mpat_t')]
+    links = [link.find('a') for link in links]
     # Create a list of paper titles
     paper_titles = []
     for title in titles:
@@ -70,30 +83,28 @@ def pull_papers(url, journal_name):
     paper_cites = []
     for cite in cites:
         paper_cites.append(cite.text)
-    # Create a dataframe of the paper titles, authors, years, and cites
-    if len(paper_titles) > 20:
-        print(paper_titles)
-    if len(paper_authors) > 20:
-        print(paper_authors)
-    if len(paper_years) > 20:
-        print(paper_years)
-    if len(paper_cites) > 20:
-        print(paper_cites)
-    df = pd.DataFrame({'Title': paper_titles, 'Authors': paper_authors, 'Year': paper_years, 'Cites': paper_cites, 'Journal': journal_name})
+    paper_links = []
+    for link in links:
+        if link is not None:
+            paper_links.append("https://scholar.google.com" + link['href'])
+    df = pd.DataFrame({'Title': paper_titles, 'Authors': paper_authors, 'Year': paper_years, 'Cites': paper_cites, 'Journal': journal_name, 'Link': paper_links})
     return df
 
 if __name__ == '__main__':
     df_econ = pull_journals(ECON_URL)
     df_econ.to_csv('data/econ_journals.csv')
     df_finance = pull_journals(FINANCE_URL)
-    print(df_finance)
     df_finance.to_csv('data/finance_journals.csv')
-    for journal, journal_name in zip([*df_econ['Link'], *df_finance['Link']], [*df_econ['Journal'], *df_finance['Journal']]):
-        print(journal_name)
-        df2 = pull_papers(journal, journal_name)
-        print(df2)
-        df2.to_csv('data/' + journal_name + '.csv')
-        time.sleep(5)
+    df_acct = pull_journals(ACCT_URL)
+    df_acct.to_csv('data/acct_journals.csv')
+    df_bus = pull_journals(BUS_URL)
+    for journal, journal_name in zip([*df_econ['Link'], *df_finance['Link'], *df_acct['Link']] *df_bus['Link'], [*df_econ['Journal'], *df_finance['Journal'], *df_acct['Journal'], *df_bus['Journal']]):
+        if journal_name in my_top_journals:
+            print(journal_name)
+            df2 = pull_papers(journal, journal_name)
+            print(df2)
+            df2.to_csv('data/' + journal_name + '.csv')
+            time.sleep(5)
 
 
     
